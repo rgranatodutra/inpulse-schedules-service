@@ -28,7 +28,7 @@ class SchedulesController {
 
             const insertedSchedule = await prisma.schedule.create({ data: { clientName, ...body } });
 
-            const url = `http://localhost:8000/api/${clientName}/custom-routes/finish-attendance`;
+            const url = `${process.env.WHATSAPP_SERVICE_URL}/api/${clientName}/custom-routes/finish-attendance`;
             await axios.post(url, {
                 operatorId: body.toUserId,
                 sectorId: body.sectorId,

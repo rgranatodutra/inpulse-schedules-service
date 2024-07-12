@@ -23,8 +23,12 @@ async function checkSchedules() {
             sectorId: schedule.sectorId,
         }
 
-        await axios.post(url, attendanceData);
-        await prisma.schedule.update({ where: { id: schedule.id }, data: { startedAt: new Date(), alreadyStarted: true } });
+        await Promise.all(
+            [
+                axios.post(url, attendanceData),
+                prisma.schedule.update({ where: { id: schedule.id }, data: { startedAt: new Date(), alreadyStarted: true } })
+            ]
+        );
     }));
 }
 
