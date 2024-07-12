@@ -22,23 +22,19 @@ class SchedulesController {
     }
 
     private async create(req: Request, res: Response) {
-        try {
-            const clientName = req.params.clientName;
-            const body: CreateScheduleDto = req.body;
+        const clientName = req.params.clientName;
+        const body: CreateScheduleDto = req.body;
 
-            const insertedSchedule = await prisma.schedule.create({ data: { clientName, ...body } });
+        const insertedSchedule = await prisma.schedule.create({ data: { clientName, ...body } });
 
-            const url = `${process.env.WHATSAPP_SERVICE_URL}/api/${clientName}/custom-routes/finish-attendance`;
-            await axios.post(url, {
-                operatorId: body.toUserId,
-                sectorId: body.sectorId,
-                contactId: body.whatsappId,
-            });
+        const url = `${process.env.WHATSAPP_SERVICE_URL}/api/${clientName}/custom-routes/finish-attendance`;
+        await axios.post(url, {
+            operatorId: body.toUserId,
+            sectorId: body.sectorId,
+            contactId: body.whatsappId,
+        });
 
-            return res.status(201).json({ message: "successful inserted schedule", data: insertedSchedule });
-        } catch (err: any) {
-            console.error(err?.response || err.message)
-        }
+        return res.status(201).json({ message: "successful inserted schedule", data: insertedSchedule });
     }
 
     private async update(req: Request, res: Response) {
