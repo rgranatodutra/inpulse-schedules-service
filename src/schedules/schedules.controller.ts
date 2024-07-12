@@ -7,6 +7,7 @@ import { validateDto } from "inpulse-crm/utils";
 import Instances from "../services/instances.service";
 import { ContactDetails, FETCH_CONTACT_DETAILS, FETCH_SECTOR_DETAILS, FETCH_USER_DETAILS, SectorDetails, UserDetails } from "./query/detailedQuery.select";
 import axios from "axios";
+import "dotenv/config";
 
 class SchedulesController {
     public readonly router: Router;
