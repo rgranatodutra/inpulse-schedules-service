@@ -1,13 +1,9 @@
 import { Request, Response, Router } from "express";
-import { prisma } from "../services/prisma.service";
+import { validateDto } from "inpulse-crm/utils";
+import "dotenv/config";
+import SchedulesService from "./schedules.service";
 import { CreateScheduleDto } from "./dto/create-schedule.dto";
 import { UpdateScheduleDto } from "./dto/update-schedule.dto";
-import { NotFoundError } from "@rgranatodutra/http-errors";
-import { validateDto } from "inpulse-crm/utils";
-import Instances from "../services/instances.service";
-import { ContactDetails, FETCH_CONTACT_DETAILS, FETCH_SECTOR_DETAILS, FETCH_USER_DETAILS, SectorDetails, UserDetails } from "./query/detailedQuery.select";
-import axios from "axios";
-import "dotenv/config";
 
 class SchedulesController {
     public readonly router: Router;
@@ -24,115 +20,37 @@ class SchedulesController {
 
     private async create(req: Request, res: Response) {
         const clientName = req.params.clientName;
-        const body: CreateScheduleDto = req.body;
+        const schedule = SchedulesService.create(clientName, req.body);
 
-        const insertedSchedule = await prisma.schedule.create({ data: { clientName, ...body } });
-
-
-        const url = `${process.env.WHATSAPP_SERVICE_URL}/api/${clientName}/custom-routes/finish-attendance`;
-        console.log("URL", url)
-        await axios.post(url, {
-            operatorId: body.toUserId,
-            sectorId: body.sectorId,
-            contactId: body.whatsappId,
-        });
-
-        return res.status(201).json({ message: "successful inserted schedule", data: insertedSchedule });
+        return res.status(201).json({ message: "successful inserted schedule", data: schedule });
     }
 
     private async update(req: Request, res: Response) {
-        const { clientName, scheduleId } = req.params;
-        const body: UpdateScheduleDto = req.body;
+        const { scheduleId } = req.params;
+        const schedule = SchedulesService.update(scheduleId, req.body);
 
-        const findSchedule = await prisma.schedule.findUnique({ where: { id: scheduleId, clientName } });
-        if (!findSchedule) {
-            throw new NotFoundError("schedule not found");
-        }
-
-        const updatedSchedule = await prisma.schedule.update({ where: { id: scheduleId, clientName }, data: body });
-        return res.status(200).json({ message: "successful updated schedule", data: updatedSchedule });
+        return res.status(200).json({ message: "successful updated schedule", data: schedule });
     }
 
     private async remove(req: Request, res: Response) {
-        const { clientName, scheduleId } = req.params;
+        const { scheduleId } = req.params;
+        const schedule = await SchedulesService.delete(scheduleId);
 
-        const findSchedule = await prisma.schedule.findUnique({ where: { id: scheduleId, clientName } });
-        if (!findSchedule) {
-            throw new NotFoundError("schedule not found");
-        }
-
-        const removedSchedule = await prisma.schedule.delete({ where: { id: scheduleId, clientName } });
-        return res.status(200).json({ message: "successful removed schedule", data: removedSchedule });
+        return res.status(200).json({ message: "successful removed schedule", data: schedule });
     }
 
     private async findAllByClient(req: Request, res: Response) {
         const { clientName } = req.params;
+        const schedules = await SchedulesService.findAllByClient(clientName);
 
-        const schedules = await prisma.schedule.findMany({
-            where: { clientName, alreadyStarted: false },
-            orderBy: { scheduleDate: "asc" }
-        });
-
-        const usersQuery = FETCH_USER_DETAILS + "\nWHERE CODIGO IN (?)";
-        const userIds = Array.from(new Set([...schedules.map(s => s.toUserId), ...schedules.map(s => s.byUserId)]));
-        const users = userIds.length ? await Instances.runQuery<UserDetails[]>(clientName, usersQuery, [userIds]) : [];
-
-        const contactsQuery = FETCH_CONTACT_DETAILS + "\nWHERE ctt.CODIGO IN (?)";
-        const contactIds = Array.from(new Set(schedules.map(s => s.whatsappId)));
-        const contacts = contactIds.length ? await Instances.runQuery<ContactDetails[]>(clientName, contactsQuery, [contactIds]) : [];
-
-        const sectorsQuery = FETCH_SECTOR_DETAILS + "\nWHERE CODIGO IN (?)";
-        const sectorIds = Array.from(new Set(schedules.map(s => s.sectorId)));
-        const sectors = sectorIds.length ? await Instances.runQuery<SectorDetails[]>(clientName, sectorsQuery, [sectorIds]) : [];
-
-        const detailedSchedules = schedules.map(s => {
-            const toUser = users.find(u => u.id === s.toUserId);
-            const byUser = users.find(u => u.id === s.byUserId);
-            const contact = contacts.find(c => c.id === s.whatsappId);
-            const sector = sectors.find(sec => sec.id === s.sectorId);
-
-            return { toUserName: toUser.userName, byUserName: byUser.userName, ...contact, ...sector, ...s }
-        });
-
-        return res.status(200).json({ message: "successful fetched client schedules", data: detailedSchedules });
+        return res.status(200).json({ message: "successful fetched client schedules", data: schedules });
     }
 
     private async findAllByUser(req: Request, res: Response) {
-        try {
-            const { clientName, toUserId } = req.params;
+        const { clientName, toUserId } = req.params;
+        const schedules = await SchedulesService.findAllByUser(clientName, +toUserId);
 
-            const schedules = await prisma.schedule.findMany({
-                where: { clientName, toUserId: +toUserId, alreadyStarted: false },
-                orderBy: { scheduleDate: "asc" }
-            });
-
-            const usersQuery = FETCH_USER_DETAILS + "\nWHERE CODIGO IN (?)";
-            const userIds = Array.from(new Set([...schedules.map(s => s.toUserId), ...schedules.map(s => s.byUserId)]));
-            const users = userIds.length ? await Instances.runQuery<UserDetails[]>(clientName, usersQuery, [userIds]) : [];
-
-            const contactsQuery = FETCH_CONTACT_DETAILS + "\nWHERE ctt.CODIGO IN (?)";
-            const contactIds = Array.from(new Set(schedules.map(s => s.whatsappId)));
-            const contacts = contactIds.length ? await Instances.runQuery<ContactDetails[]>(clientName, contactsQuery, [contactIds]) : [];
-
-            const sectorsQuery = FETCH_SECTOR_DETAILS + "\nWHERE CODIGO IN (?)";
-            const sectorIds = Array.from(new Set(schedules.map(s => s.sectorId)));
-            const sectors = sectorIds.length ? await Instances.runQuery<SectorDetails[]>(clientName, sectorsQuery, [sectorIds]) : [];
-
-            const detailedSchedules = schedules.map(s => {
-                const toUser = users.find(u => u.id === s.toUserId);
-                const byUser = users.find(u => u.id === s.byUserId);
-                const contact = contacts.find(c => c.id === s.whatsappId);
-                const sector = sectors.find(sec => sec.id === s.sectorId);
-
-                return { toUserName: toUser.userName, byUserName: byUser.userName, ...contact, ...sector, ...s }
-            });
-
-
-            return res.status(200).json({ message: "successful fetched user schedules", data: detailedSchedules });
-        } catch (err) {
-            console.error(err);
-            return res.status(500).json({ message: "unknown server error", err });
-        }
+        return res.status(200).json({ message: "successful fetched user schedules", data: schedules });
     }
 }
 

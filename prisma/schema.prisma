@@ -20,8 +20,27 @@ model Schedule {
   scheduledAt    DateTime  @default(now())
   startedAt      DateTime?
   alreadyStarted Boolean?  @default(false)
+  sectorId       Int
   whatsappId     Int
   toUserId       Int
   byUserId       Int
-  sectorId       Int
+}
+
+model Attendance {
+  id         String         @id @default(uuid())
+  clientName String
+  type       AttendanceType
+  whatsappId Int
+  userId     Int
+  avatarUrl  String
+  startedAt  DateTime
+  finishedAt DateTime?
+}
+
+enum AttendanceType {
+  normal
+  firstContact
+  botRegistration
+  contactResearch
+  satisfactionResearch
 }
